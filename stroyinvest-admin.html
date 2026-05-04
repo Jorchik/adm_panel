@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СтройИнвест — Каталог + Админка</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --bg:#0f1115; --card:#171a21; --line:#2a3140; --acc:#f6c141; --txt:#f3f4f6; --mut:#9ca3af; }
+    body{background:var(--bg);color:var(--txt)} .card{background:var(--card);border:1px solid var(--line)}
+    .btn{padding:.6rem .95rem;border-radius:.6rem;font-weight:700}.btn-y{background:var(--acc);color:#111}
+    .btn-o{border:1px solid var(--line)} .inp{background:#11151d;border:1px solid var(--line);border-radius:.6rem;padding:.55rem .7rem;width:100%}
+    .hidden-view{display:none!important}
+  </style>
+</head>
+<body class="font-sans">
+  <header class="sticky top-0 z-20 backdrop-blur border-b border-slate-700/70 bg-[#0f1115]/90">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <h1 class="font-black tracking-wide text-xl">СтройИнвест</h1>
+      <div class="flex gap-2">
+        <button class="btn btn-o js-view" data-view="shop">Каталог</button>
+        <button class="btn btn-y js-view" data-view="admin">Админ-панель</button>
+        <button class="btn btn-o hidden-view" id="logoutBtn">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <section id="shopView">
+      <div class="grid lg:grid-cols-4 gap-4 mb-4">
+        <input id="q" class="inp lg:col-span-2" placeholder="Поиск по названию/типу..." />
+        <select id="typeFilter" class="inp"></select>
+        <select id="sort" class="inp">
+          <option value="popular">Популярные</option>
+          <option value="priceAsc">Сначала дешевле</option>
+          <option value="priceDesc">Сначала дороже</option>
+          <option value="name">По названию</option>
+        </select>
+      </div>
+      <div class="card rounded-xl p-3 mb-4 text-sm text-slate-300 flex justify-between">
+        <span>Товаров: <b id="count">0</b></span>
+        <span>Корзина: <b id="cartCount">0</b> шт / <b id="cartSum">0 ₽</b></span>
+      </div>
+      <div id="grid" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </section>
+
+    <section id="adminView" class="hidden-view space-y-6">
+      <div class="grid md:grid-cols-4 gap-4">
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Всего товаров</p><p id="sTotal" class="text-3xl font-black">0</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Средняя цена</p><p id="sAvg" class="text-3xl font-black">0 ₽</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Мин/Макс</p><p id="sRange" class="text-xl font-black">0 ₽</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">В корзине</p><p id="sCart" class="text-3xl font-black text-emerald-400">0</p></div>
+      </div>
+      <div class="grid md:grid-cols-4 gap-4">
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Визиты</p><p id="aVisits" class="text-3xl font-black">0</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Уникальные</p><p id="aUnique" class="text-3xl font-black">0</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Просмотры товаров</p><p id="aViews" class="text-3xl font-black">0</p></div>
+        <div class="card rounded-xl p-4"><p class="text-slate-400 text-sm">Добавления в корзину</p><p id="aAdds" class="text-3xl font-black">0</p></div>
+      </div>
+
+      <form id="productForm" class="card rounded-xl p-4 grid md:grid-cols-8 gap-3 items-end">
+        <input type="hidden" id="pid" />
+        <label class="md:col-span-2"><span class="text-sm text-slate-400">Название</span><input id="title" class="inp" required /></label>
+        <label><span class="text-sm text-slate-400">Тип</span><input id="type" class="inp" required /></label>
+        <label><span class="text-sm text-slate-400">Цена</span><input id="price" type="number" min="1" step="0.01" class="inp" required /></label>
+        <label><span class="text-sm text-slate-400">Ед.</span><input id="unit" class="inp" value="₽/шт" required /></label>
+        <label class="md:col-span-2"><span class="text-sm text-slate-400">URL картинки (первая)</span><input id="img" class="inp" placeholder="https://..." /></label>
+        <label class="md:col-span-8"><span class="text-sm text-slate-400">Доп. фото (каждое с новой строки)</span><textarea id="images" class="inp" rows="3" placeholder="https://..."></textarea></label>
+        <div class="flex gap-2">
+          <button class="btn btn-y w-full" type="submit">Сохранить</button>
+          <button class="btn btn-o w-full" id="resetEdit" type="button">Сброс</button>
+        </div>
+        <div class="md:col-span-8 flex items-center gap-3">
+          <img id="imgPreview" src="https://placehold.co/120x70/111827/f6c141?text=Preview" class="w-[120px] h-[70px] object-cover rounded border border-slate-700" alt="preview">
+          <div class="flex flex-wrap gap-2">
+            <button class="btn btn-o text-sm" id="exportBtn" type="button">Экспорт JSON</button>
+            <label class="btn btn-o text-sm cursor-pointer">
+              Импорт JSON
+              <input id="importFile" type="file" accept="application/json" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </form>
+
+      <div class="card rounded-xl overflow-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-900/60 text-slate-300">
+            <tr><th class="text-left p-3">ID</th><th class="text-left p-3">Название</th><th class="text-left p-3">Тип</th><th class="text-left p-3">Цена</th><th class="text-right p-3">Действия</th></tr>
+          </thead>
+          <tbody id="adminRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="loginModal" class="fixed inset-0 bg-black/60 hidden-view items-center justify-center p-4">
+    <form id="loginForm" class="card rounded-xl p-5 w-full max-w-md space-y-3">
+      <h2 class="text-xl font-bold">Вход в админку</h2>
+      <p class="text-sm text-slate-400">Введите пароль администратора</p>
+      <input id="adminPass" type="password" class="inp" placeholder="Пароль" required />
+      <p id="loginErr" class="text-sm text-rose-300 min-h-[20px]"></p>
+      <button class="btn btn-y w-full" type="submit">Войти</button>
+    </form>
+  </div>
+
+  <script>
+    const $ = (s, p = document) => p.querySelector(s);
+    const fmt = n => `${Number(n || 0).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₽`;
+    const API = "http://localhost:3000/api";
+    const tokenKey = "stroyinvest-admin-token";
+
+    const fallbackImg = "https://placehold.co/600x340/111827/f6c141?text=Товар";
+    const state = { view: "shop", query: "", type: "Все", sort: "popular", cart: [], products: [] };
+    const auth = () => sessionStorage.getItem(tokenKey) || "";
+    const hdrs = (authOnly = false) => {
+      const h = { "Content-Type": "application/json" };
+      if (auth()) h.Authorization = `Bearer ${auth()}`;
+      return authOnly ? { Authorization: h.Authorization || "" } : h;
+    };
+    const isAuthed = () => Boolean(auth());
+
+    async function req(path, options = {}) {
+      const r = await fetch(`${API}${path}`, options);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Ошибка запроса");
+      return data;
+    }
+
+    const filtered = () => {
+      const q = state.query.toLowerCase().trim();
+      return [...state.products]
+        .filter(p => (state.type === "Все" || p.type === state.type) && (!q || `${p.title} ${p.type}`.toLowerCase().includes(q)))
+        .sort((a, b) => ({ priceAsc: a.price - b.price, priceDesc: b.price - a.price, name: a.title.localeCompare(b.title), popular: a.id - b.id }[state.sort]));
+    };
+    const cartInfo = () => state.cart.reduce((a, i) => ({ qty: a.qty + i.qty, sum: a.sum + i.qty * i.price }), { qty: 0, sum: 0 });
+
+    function renderShop() {
+      const list = filtered(), grid = $("#grid"), types = ["Все", ...new Set(state.products.map(p => p.type))];
+      $("#typeFilter").innerHTML = types.map(t => `<option ${state.type===t?"selected":""}>${t}</option>`).join("");
+      $("#count").textContent = list.length;
+      const c = cartInfo(); $("#cartCount").textContent = c.qty; $("#cartSum").textContent = fmt(c.sum);
+      grid.innerHTML = list.length ? list.map(p => `
+        <article class="card rounded-xl overflow-hidden">
+          <img src="${p.img || fallbackImg}" alt="${p.title}" class="w-full h-44 object-cover">
+          <div class="p-4 space-y-2">
+            <p class="text-xs text-slate-400">${p.type}</p>
+            <h3 class="font-bold leading-tight">${p.title}</h3>
+            <div class="flex items-center justify-between">
+              <b>${fmt(p.price)} <span class="text-slate-400 text-xs">${p.unit}</span></b>
+              <button class="btn btn-y py-2 px-3 text-sm" data-add="${p.id}">В корзину</button>
+            </div>
+          </div>
+        </article>`).join("") : `<div class="card rounded-xl p-8 text-slate-400 col-span-full">Ничего не найдено</div>`;
+    }
+
+    async function renderAdmin() {
+      $("#logoutBtn").classList.toggle("hidden-view", !isAuthed());
+      const rows = $("#adminRows");
+      rows.innerHTML = state.products.map(p => `
+        <tr class="border-t border-slate-700/60">
+          <td class="p-3">${p.id}</td><td class="p-3">${p.title}</td><td class="p-3">${p.type}</td><td class="p-3">${fmt(p.price)}</td>
+          <td class="p-3 text-right space-x-2">
+            <button class="btn btn-o text-xs" data-edit="${p.id}">Редакт.</button>
+            <button class="btn btn-o text-xs text-rose-300" data-del="${p.id}">Удалить</button>
+          </td>
+        </tr>`).join("");
+      try {
+        const s = await req("/stats", { headers: hdrs(true) });
+        $("#sTotal").textContent = s.total;
+        $("#sAvg").textContent = fmt(s.avgPrice);
+        $("#sRange").textContent = `${fmt(s.minPrice)} / ${fmt(s.maxPrice)}`;
+        $("#aVisits").textContent = s.analytics?.visits || 0;
+        $("#aUnique").textContent = s.analytics?.uniqueVisitors || 0;
+        $("#aViews").textContent = s.analytics?.productViews || 0;
+        $("#aAdds").textContent = s.analytics?.cartAdds || 0;
+      } catch (_) {
+        const prices = state.products.map(p => p.price), avg = prices.reduce((a,b)=>a+b,0)/(prices.length||1);
+        $("#sTotal").textContent = state.products.length; $("#sAvg").textContent = fmt(avg);
+        $("#sRange").textContent = `${fmt(Math.min(...prices,0))} / ${fmt(Math.max(...prices,0))}`;
+        $("#aVisits").textContent = 0;
+        $("#aUnique").textContent = 0;
+        $("#aViews").textContent = 0;
+        $("#aAdds").textContent = 0;
+      }
+      $("#sCart").textContent = cartInfo().qty;
+    }
+
+    async function render() {
+      $("#shopView").classList.toggle("hidden-view", state.view !== "shop");
+      $("#adminView").classList.toggle("hidden-view", state.view !== "admin");
+      renderShop();
+      if (state.view === "admin" && isAuthed()) await renderAdmin();
+    }
+
+    async function loadProducts() {
+      const data = await req("/products");
+      state.products = data.products || [];
+      await render();
+    }
+
+    function openLogin(show) {
+      const m = $("#loginModal");
+      m.classList.toggle("hidden-view", !show);
+      m.classList.toggle("flex", show);
+      if (show) { $("#adminPass").focus(); $("#loginErr").textContent = ""; }
+    }
+
+    document.addEventListener("click", async e => {
+      const v = e.target.closest(".js-view");
+      if (v) {
+        if (v.dataset.view === "admin" && !isAuthed()) return openLogin(true);
+        state.view = v.dataset.view; return render();
+      }
+      const add = e.target.closest("[data-add]");
+      if (add) {
+        const p = state.products.find(x => x.id === +add.dataset.add), c = state.cart.find(x => x.id === p.id);
+        c ? c.qty++ : state.cart.push({ id: p.id, price: p.price, qty: 1 });
+        return renderShop();
+      }
+      const edit = e.target.closest("[data-edit]");
+      if (edit) {
+        const p = state.products.find(x => x.id === +edit.dataset.edit);
+        ["pid","title","type","price","unit","img"].forEach(k => $("#"+k).value = p[k] ?? "");
+        $("#images").value = (p.images || []).slice(1).join("\n");
+        $("#imgPreview").src = p.img || fallbackImg;
+      }
+      const del = e.target.closest("[data-del]");
+      if (del) {
+        await req(`/products/${+del.dataset.del}`, { method: "DELETE", headers: hdrs() });
+        await loadProducts();
+      }
+    });
+
+    $("#q").addEventListener("input", e => { state.query = e.target.value; renderShop(); });
+    $("#typeFilter").addEventListener("change", e => { state.type = e.target.value; renderShop(); });
+    $("#sort").addEventListener("change", e => { state.sort = e.target.value; renderShop(); });
+    $("#img").addEventListener("input", e => { $("#imgPreview").src = e.target.value.trim() || fallbackImg; });
+      $("#resetEdit").addEventListener("click", () => {
+      $("#productForm").reset();
+      $("#pid").value = "";
+      $("#unit").value = "₽/шт";
+      $("#img").value = "";
+        $("#images").value = "";
+      $("#imgPreview").src = fallbackImg;
+    });
+    $("#logoutBtn").addEventListener("click", () => { sessionStorage.removeItem(tokenKey); state.view = "shop"; openLogin(false); render(); });
+    $("#exportBtn").addEventListener("click", async () => {
+      const out = await req("/products/export", { headers: hdrs(true) });
+      const blob = new Blob([JSON.stringify(out.products, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "products-export.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    $("#importFile").addEventListener("change", async e => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const text = await f.text();
+      const products = JSON.parse(text);
+      await req("/products/import", { method: "POST", headers: hdrs(), body: JSON.stringify({ products }) });
+      e.target.value = "";
+      await loadProducts();
+      alert("Импорт завершен");
+    });
+
+    $("#loginForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      try {
+        const data = await req("/auth", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify({ password: $("#adminPass").value }) });
+        sessionStorage.setItem(tokenKey, data.token);
+        openLogin(false); state.view = "admin"; await render();
+      } catch (err) { $("#loginErr").textContent = err.message; }
+    });
+
+    $("#productForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const extraImages = $("#images").value.split("\n").map(s => s.trim()).filter(Boolean);
+      const payload = {
+        title: $("#title").value.trim(),
+        type: $("#type").value.trim(),
+        price: +$("#price").value,
+        unit: $("#unit").value.trim(),
+        img: $("#img").value.trim() || fallbackImg,
+        images: [$("#img").value.trim() || fallbackImg, ...extraImages]
+      };
+      const id = +$("#pid").value;
+      await req(id ? `/products/${id}` : "/products", {
+        method: id ? "PUT" : "POST",
+        headers: hdrs(),
+        body: JSON.stringify(payload)
+      });
+      $("#resetEdit").click();
+      await loadProducts();
+    });
+
+    loadProducts().catch(() => alert("Не удалось подключиться к API. Запустите backend: node server.js"));
+  </script>
+</body>
+</html>
