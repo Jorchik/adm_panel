@@ -52,15 +52,26 @@ async function readJsonFile(file, fallback) {
 }
 
 async function writeJsonFile(file, value) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(value, null, 2), "utf8");
+  console.log("[writeJsonFile] Writing to:", file);
+  console.log("[writeJsonFile] Data:", JSON.stringify(value, null, 2));
+  try {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, JSON.stringify(value, null, 2), "utf8");
+    console.log("[writeJsonFile] Successfully wrote to:", file);
+  } catch (err) {
+    console.error("[writeJsonFile] Error writing to:", file, err);
+    throw err;
+  }
 }
 
 async function readProducts() {
-  return readJsonFile(DATA_FILE, []);
+  const products = await readJsonFile(DATA_FILE, []);
+  console.log("[readProducts] Read", products.length, "products from:", DATA_FILE);
+  return products;
 }
 
 async function writeProducts(list) {
+  console.log("[writeProducts] Saving", list.length, "products:", JSON.stringify(list, null, 2));
   await writeJsonFile(DATA_FILE, list);
 }
 
@@ -227,6 +238,7 @@ http.createServer(async (req, res) => {
     if (req.method === "POST" && pathName === "/api/products") {
       if (!adminOnly(req, res)) return;
       const body = await getBody(req);
+      console.log("[POST /api/products] Received body:", JSON.stringify(body, null, 2));
       const { title, type, price, unit } = body;
       if (!title || !type || !price || !unit) return fail(res, 400, "Заполните title/type/price/unit");
       const list = await readProducts();
@@ -235,6 +247,7 @@ http.createServer(async (req, res) => {
       const item = { id, title, type, price: Number(price), unit, images, img: images[0] };
       list.unshift(item);
       await writeProducts(list);
+      console.log("[POST /api/products] writeProducts completed, product saved:", JSON.stringify(item, null, 2));
       return ok(res, { product: item });
     }
 
