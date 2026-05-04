@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СтройИнвест — Каталог</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --bg:#0f1115; --card:#171a21; --line:#2a3140; --acc:#f6c141; --txt:#f3f4f6; --mut:#9ca3af; }
+    body { background: var(--bg); color: var(--txt); }
+    .card { background: var(--card); border: 1px solid var(--line); }
+    .btn { padding: .6rem .95rem; border-radius: .6rem; font-weight: 700; }
+    .btn-y { background: var(--acc); color: #111; }
+    .btn-o { border: 1px solid var(--line); }
+    .inp { background: #11151d; border: 1px solid var(--line); border-radius: .6rem; padding: .55rem .7rem; width: 100%; }
+    #loadingMsg { display: none; }
+    #errorMsg { display: none; }
+  </style>
+</head>
+<body class="font-sans">
+  <header class="sticky top-0 z-20 backdrop-blur border-b border-slate-700/70 bg-[#0f1115]/90">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <h1 class="font-black tracking-wide text-xl">СтройИнвест</h1>
+      <span class="text-sm text-slate-400">Каталог строительных материалов</span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-4">
+    <div class="grid lg:grid-cols-4 gap-4 mb-4">
+      <input id="q" class="inp lg:col-span-2" placeholder="Поиск по названию/типу..." />
+      <select id="typeFilter" class="inp"></select>
+      <select id="sort" class="inp">
+        <option value="popular">Популярные</option>
+        <option value="priceAsc">Сначала дешевле</option>
+        <option value="priceDesc">Сначала дороже</option>
+        <option value="name">По названию</option>
+      </select>
+    </div>
+
+    <div class="card rounded-xl p-3 mb-4 text-sm text-slate-300 flex justify-between">
+      <span>Товаров: <b id="count">0</b></span>
+      <span>Корзина: <b id="cartCount">0</b> шт / <b id="cartSum">0 ₽</b></span>
+    </div>
+
+    <div id="loadingMsg" class="card rounded-xl p-8 text-slate-400 text-center">
+      Загрузка каталога…
+    </div>
+    <div id="errorMsg" class="card rounded-xl p-8 text-rose-400 text-center">
+      Не удалось загрузить каталог. Попробуйте обновить страницу.
+    </div>
+
+    <div id="grid" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+  </main>
+
+  <script>
+    const API_PRODUCTS_URL = 'https://adm-panel.up.railway.app/api/products';
+    const fallbackImg = 'https://placehold.co/600x340/111827/f6c141?text=Товар';
+    const fmt = n => `${Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`;
+    const $ = (s, p = document) => p.querySelector(s);
+
+    const state = {
+      products: [],
+      query: '',
+      type: 'Все',
+      sort: 'popular',
+      cart: []
+    };
+
+    function normalizeProduct(p, index) {
+      const images = Array.isArray(p.images) && p.images.length
+        ? p.images
+        : (p.img ? [p.img] : [fallbackImg]);
+      return {
+        id: Number(p.id) || index + 1,
+        title: String(p.title || '').trim(),
+        type: String(p.type || '').trim(),
+        price: Number(p.price) || 0,
+        unit: String(p.unit || '₽/шт'),
+        img: images[0] || fallbackImg,
+        images
+      };
+    }
+
+    async function loadProductsFromApi() {
+      $('#loadingMsg').style.display = 'block';
+      $('#errorMsg').style.display = 'none';
+      $('#grid').innerHTML = '';
+
+      try {
+        const res = await fetch(API_PRODUCTS_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const raw = Array.isArray(data.products) ? data.products : (Array.isArray(data) ? data : []);
+        state.products = raw
+          .map((p, i) => normalizeProduct(p, i))
+          .filter(p => p.title && p.type && p.price > 0);
+      } catch (err) {
+        console.error('[loadProductsFromApi] Failed to fetch products:', err);
+        $('#loadingMsg').style.display = 'none';
+        $('#errorMsg').style.display = 'block';
+        return;
+      }
+
+      $('#loadingMsg').style.display = 'none';
+      render();
+    }
+
+    function filtered() {
+      const q = state.query.toLowerCase().trim();
+      return [...state.products]
+        .filter(p =>
+          (state.type === 'Все' || p.type === state.type) &&
+          (!q || `${p.title} ${p.type}`.toLowerCase().includes(q))
+        )
+        .sort((a, b) => ({
+          priceAsc: a.price - b.price,
+          priceDesc: b.price - a.price,
+          name: a.title.localeCompare(b.title),
+          popular: a.id - b.id
+        }[state.sort]));
+    }
+
+    function cartInfo() {
+      return state.cart.reduce(
+        (a, i) => ({ qty: a.qty + i.qty, sum: a.sum + i.qty * i.price }),
+        { qty: 0, sum: 0 }
+      );
+    }
+
+    function render() {
+      const list = filtered();
+      const types = ['Все', ...new Set(state.products.map(p => p.type))];
+
+      $('#typeFilter').innerHTML = types
+        .map(t => `<option ${state.type === t ? 'selected' : ''}>${t}</option>`)
+        .join('');
+
+      $('#count').textContent = list.length;
+
+      const c = cartInfo();
+      $('#cartCount').textContent = c.qty;
+      $('#cartSum').textContent = fmt(c.sum);
+
+      $('#grid').innerHTML = list.length
+        ? list.map(p => `
+          <article class="card rounded-xl overflow-hidden">
+            <img src="${p.img}" alt="${p.title}" class="w-full h-44 object-cover"
+                 onerror="this.src='${fallbackImg}'">
+            <div class="p-4 space-y-2">
+              <p class="text-xs text-slate-400">${p.type}</p>
+              <h3 class="font-bold leading-tight">${p.title}</h3>
+              <div class="flex items-center justify-between">
+                <b>${fmt(p.price)} <span class="text-slate-400 text-xs">${p.unit}</span></b>
+                <button class="btn btn-y py-2 px-3 text-sm" data-add="${p.id}">В корзину</button>
+              </div>
+            </div>
+          </article>`).join('')
+        : `<div class="card rounded-xl p-8 text-slate-400 col-span-full">Ничего не найдено</div>`;
+    }
+
+    $('#q').addEventListener('input', e => { state.query = e.target.value; render(); });
+    $('#typeFilter').addEventListener('change', e => { state.type = e.target.value; render(); });
+    $('#sort').addEventListener('change', e => { state.sort = e.target.value; render(); });
+
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-add]');
+      if (!btn) return;
+      const p = state.products.find(x => x.id === +btn.dataset.add);
+      if (!p) return;
+      const existing = state.cart.find(x => x.id === p.id);
+      existing ? existing.qty++ : state.cart.push({ id: p.id, price: p.price, qty: 1 });
+      render();
+    });
+
+    // Fetch products from the admin panel API on every page load
+    loadProductsFromApi();
+  </script>
+</body>
+</html>
